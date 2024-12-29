@@ -9,7 +9,7 @@ ver="$(cat "$DIR/magisk_version" 2>/dev/null || echo -n 'none')"
 if [[ "x$1" =~ x.*delta ]]
 then
 	if [ "$1" = "delta" ]; then
-		nver="$(curl -s https://github.com/HuskyDG/magisk-files/releases | grep -m 1 -Poe '[a-f0-9]{8}-delta')"
+    nver=$(curl -s "https://api.github.com/repos/HuskyDG/magisk-files/releases" -H "Accept: application/vnd.github.v3+json" | grep -m 1 '"tag_name":' | sed 's/.*"tag_name": "\(.*\)".*/\1/')
 	else
 		nver="$1"
 	fi
