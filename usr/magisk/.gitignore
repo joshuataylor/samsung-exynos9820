@@ -2,3 +2,10 @@ magiskinit
 magiskinit64
 magisk_version
 backup_magisk
+magisk
+magisk.xz
+init-ld
+init-ld.xz
+stub
+stub.xz
+initramfs_list

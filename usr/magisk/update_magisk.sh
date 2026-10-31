@@ -43,12 +43,37 @@ then
   if grep -F 'Not Found' "$DIR/magisk.zip"; then
 		curl -s --output "$DIR/magisk.zip" -L "${magisk_link%.apk}.zip"
 	fi
-  #https://github.com/topjohnwu/Magisk/issues/8629#issuecomment-2546371565
-  single_magiskinit="0"
-  if [[ $nver =~ v28.* ]]; then
-    single_magiskinit="1"
-  fi
-  if [[ "${single_magiskinit:-}" == "0" ]]; then
+  # Magisk v28+ ships a single magiskinit and a single magisk binary per ABI
+  # (topjohnwu/Magisk#8629), so detect the layout from the APK contents rather
+  # than the version string. canary, alpha and delta builds can be either.
+  if unzip -l "$DIR/magisk.zip" lib/arm64-v8a/libmagisk.so >/dev/null 2>&1; then
+    echo "Single magisk binary layout (Magisk v28+)"
+    rm -f "$DIR/magisk" "$DIR/magisk.xz" "$DIR/init-ld" "$DIR/init-ld.xz" "$DIR/stub" "$DIR/stub.xz"
+    unzip -o "$DIR/magisk.zip" lib/arm64-v8a/libmagiskinit.so lib/arm64-v8a/libmagisk.so -d "$DIR"
+    mv -f "$DIR/lib/arm64-v8a/libmagiskinit.so" "$DIR/magiskinit"
+    mv -f "$DIR/lib/arm64-v8a/libmagisk.so" "$DIR/magisk"
+    xz --force --check=crc32 "$DIR/magisk"
+    {
+      echo "dir /.backup 0705 0 0"
+      echo "file /init usr/magisk/magiskinit 0750 0 0"
+      echo "file /.backup/.magisk usr/magisk/backup_magisk 0000 0 0"
+      echo "dir /overlay.d 0750 0 0"
+      echo "dir /overlay.d/sbin 0750 0 0"
+      echo "file /overlay.d/sbin/magisk.xz usr/magisk/magisk.xz 0644 0 0"
+    } > "$DIR/initramfs_list"
+    # init-ld appeared in v28, the stub APK was dropped in v31
+    if unzip -o "$DIR/magisk.zip" lib/arm64-v8a/libinit-ld.so -d "$DIR" >/dev/null 2>&1; then
+      mv -f "$DIR/lib/arm64-v8a/libinit-ld.so" "$DIR/init-ld"
+      xz --force --check=crc32 "$DIR/init-ld"
+      echo "file /overlay.d/sbin/init-ld.xz usr/magisk/init-ld.xz 0644 0 0" >> "$DIR/initramfs_list"
+    fi
+    if unzip -o "$DIR/magisk.zip" assets/stub.apk -d "$DIR" >/dev/null 2>&1; then
+      mv -f "$DIR/assets/stub.apk" "$DIR/stub"
+      xz --force --check=crc32 "$DIR/stub"
+      echo "file /overlay.d/sbin/stub.xz usr/magisk/stub.xz 0644 0 0" >> "$DIR/initramfs_list"
+    fi
+    rm -rf "$DIR/lib" "$DIR/assets"
+  else
     echo "Both arch magiskinit, extracting both 32 and 64 bit (Magisk <28)"
     if unzip -o "$DIR/magisk.zip" arm/magiskinit64 -d "$DIR"; then
       mv -f "$DIR/arm/magiskinit64" "$DIR/magiskinit"
@@ -73,9 +98,6 @@ then
       xz --force --check=crc32 "$DIR/magisk32" "$DIR/magisk64"
     fi
     cp "$DIR/initramfs_list_split" "$DIR/initramfs_list"
-  else
-    echo "Single arch magiskinit, extracting both 32 and 64 bit (Magisk >28)"
-    cp "$DIR/initramfs_list_single" "$DIR/initramfs_list"
   fi
   echo -n "$nver" > "$DIR/magisk_version"
   rm "$DIR/magisk.zip"

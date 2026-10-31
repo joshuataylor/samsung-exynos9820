@@ -618,6 +618,7 @@ def update_magisk(version):
 KEEPVERITY=true
 KEEPFORCEENCRYPT=true
 RECOVERYMODE=false
+VENDORBOOT=false
 PREINITDEVICE=userdata
 RANDOMSEED=0x{secrets.token_hex(8)}
 """.strip(), file=fh)
